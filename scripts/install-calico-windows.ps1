@@ -33,6 +33,9 @@ Param(
     [parameter(Mandatory = $false)] $DownloadOnly="no",
     [parameter(Mandatory = $false)] $Datastore="kubernetes",
     [parameter(Mandatory = $false)] $EtcdEndpoints="",
+    [parameter(Mandatory = $false)] $EtcdKey="",
+    [parameter(Mandatory = $false)] $EtcdCert="",
+    [parameter(Mandatory = $false)] $EtcdCaCert="",
     [parameter(Mandatory = $false)] $ServiceCidr="10.96.0.0/12",
     [parameter(Mandatory = $false)] $DNSServerIPs="10.96.0.10"
 )
@@ -185,6 +188,9 @@ Expand-Archive c:\calico-windows.zip c:\
 Write-Host "Setup Calico for Windows..."
 SetConfigParameters -OldString '<your datastore type>' -NewString $Datastore
 SetConfigParameters -OldString '<your etcd endpoints>' -NewString "$EtcdEndpoints"
+SetConfigParameters -OldString '<your etcd key>' -NewString "$EtcdKey"
+SetConfigParameters -OldString '<your etcd cert>' -NewString "$EtcdCert"
+SetConfigParameters -OldString '<your etcd ca cert>' -NewString "$EtcdCaCert"
 SetConfigParameters -OldString '<your service cidr>' -NewString $ServiceCidr
 SetConfigParameters -OldString '<your dns server ips>' -NewString $DNSServerIPs
 SetConfigParameters -OldString 'KUBECONFIG = "c:\k\config"' -NewString 'KUBECONFIG = "c:\CalicoWindows\calico-kube-config"'
