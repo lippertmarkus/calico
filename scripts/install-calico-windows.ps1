@@ -33,6 +33,7 @@ Param(
     [parameter(Mandatory = $false)] $DownloadOnly="no",
     [parameter(Mandatory = $false)] $Datastore="kubernetes",
     [parameter(Mandatory = $false)] $EtcdEndpoints="",
+    [parameter(Mandatory = $false)] $EtcdTlsBySecret=$false,
     [parameter(Mandatory = $false)] $EtcdKey="",
     [parameter(Mandatory = $false)] $EtcdCert="",
     [parameter(Mandatory = $false)] $EtcdCaCert="",
@@ -136,6 +137,33 @@ function GetCalicoKubeConfig()
     (Get-Content c:\CalicoWindows\calico-kube-config.template).replace('<ca>', $ca).replace('<server>', $server.Trim()).replace('<token>', $token) | Set-Content c:\CalicoWindows\calico-kube-config -Force
 }
 
+function SetupEtcdTlsFiles()
+{
+    param(
+      [parameter(Mandatory=$true)] $SecretName,
+      [parameter(Mandatory=$false)] $KubeConfigPath = "c:\\k\\config"
+    )
+
+    $found=c:\k\kubectl.exe --kubeconfig=$KubeConfigPath get secret/$SecretName -n kube-system
+    if ([string]::IsNullOrEmpty($found)) {
+        throw "$SecretName does not exist."
+    }
+
+    $keyB64=c:\k\kubectl.exe --kubeconfig=$KubeConfigPath get secret/$SecretName -o jsonpath='{.data.etcd-key}' -n kube-system
+    $certB64=c:\k\kubectl.exe --kubeconfig=$KubeConfigPath get secret/$SecretName -o jsonpath='{.data.etcd-cert}' -n kube-system
+    $caB64=c:\k\kubectl.exe --kubeconfig=$KubeConfigPath get secret/$SecretName -o jsonpath='{.data.etcd-ca}' -n kube-system
+
+    mkdir -Force C:\etcd-tls
+
+    [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($keyB64)) | Set-Content C:\etcd-tls\server.key -Force
+    [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($certB64)) | Set-Content C:\etcd-tls\server.crt -Force
+    [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($caB64)) | Set-Content C:\etcd-tls\ca.crt -Force
+
+    $EtcdKey = "C:\etcd-tls\server.key"
+    $EtcdCert = "C:\etcd-tls\server.crt"
+    $EtcdCaCert = "C:\etcd-tls\ca.crt"
+}
+
 function SetConfigParameters {
     param(
         [parameter(Mandatory=$true)] $OldString,
@@ -188,9 +216,14 @@ Expand-Archive c:\calico-windows.zip c:\
 Write-Host "Setup Calico for Windows..."
 SetConfigParameters -OldString '<your datastore type>' -NewString $Datastore
 SetConfigParameters -OldString '<your etcd endpoints>' -NewString "$EtcdEndpoints"
+
+if ($EtcdTlsBySecret) {
+    SetupEtcdTlsFiles -SecretName 'calico-etcd-secrets'
+}
 SetConfigParameters -OldString '<your etcd key>' -NewString "$EtcdKey"
 SetConfigParameters -OldString '<your etcd cert>' -NewString "$EtcdCert"
 SetConfigParameters -OldString '<your etcd ca cert>' -NewString "$EtcdCaCert"
+
 SetConfigParameters -OldString '<your service cidr>' -NewString $ServiceCidr
 SetConfigParameters -OldString '<your dns server ips>' -NewString $DNSServerIPs
 SetConfigParameters -OldString 'KUBECONFIG = "c:\k\config"' -NewString 'KUBECONFIG = "c:\CalicoWindows\calico-kube-config"'
